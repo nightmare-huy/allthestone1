@@ -1,0 +1,284 @@
+{
+  "_comment": "All The Stone 1 - mod catalog for download_mods.py. 'id' is the Modrinth slug (primary source), 'curseforge' is the CurseForge slug/id (secondary source), 'github' is a repo used as a last-resort release-asset source. 'search' is used when the slug no longer resolves.",
+  "minecraft": "1.21.1",
+  "loader": "neoforge",
+  "mods": [
+    {
+      "name": "Ex Deorum",
+      "id": "ex-deorum",
+      "curseforge": "ex-deorum",
+      "github": "thedarkcolour/ExDeorum",
+      "required": true,
+      "group": "core",
+      "why": "Sieves, hammers, crooks, barrels and crucibles - the backbone of a stone world.",
+      "github_asset": "^exdeorum-.*\\\\.jar$"
+    },
+    {
+      "name": "KubeJS",
+      "id": "kubejs",
+      "curseforge": "kubejs",
+      "github": "kube-mods/kubejs",
+      "github_branch_version": "2101",
+      "required": true,
+      "group": "core",
+      "why": "Scripts for the stone world, the pebble mechanic and the progression recipes.",
+      "github_asset": "^kubejs-neoforge-.*\\\\.jar$"
+    },
+    {
+      "name": "Better Advanced Tooltips",
+      "id": "better-advanced-tooltips",
+      "curseforge": "better-advanced-tooltips",
+      "required": true,
+      "group": "core",
+      "why": "KubeJS 1.21.1 no longer bundles it and loads it as a dependency (tag/component tooltips)."
+    },
+    {
+      "name": "Rhino",
+      "id": "rhino",
+      "curseforge": "rhino",
+      "github": "kube-mods/rhino",
+      "required": true,
+      "group": "core",
+      "why": "JavaScript engine used by KubeJS (hard dependency)."
+    },
+    {
+      "name": "Architectury API",
+      "id": "architectury-api",
+      "curseforge": "architectury-api",
+      "github": "architectury/architectury-api",
+      "required": true,
+      "group": "core",
+      "why": "Required by KubeJS and the FTB mods."
+    },
+    {
+      "name": "Just Enough Items",
+      "id": "jei",
+      "curseforge": "jei",
+      "github": "mezz/JustEnoughItems",
+      "required": true,
+      "group": "core",
+      "why": "Recipe viewer; FTB Quests and Ex Deorum ship JEI integrations."
+    },
+    {
+      "name": "Jade",
+      "id": "jade",
+      "curseforge": "jade",
+      "github": "Snownee/Jade",
+      "required": true,
+      "group": "core",
+      "why": "Block/entity tooltips so machines are actually usable."
+    },
+    {
+      "name": "FTB Library",
+      "id": "ftb-library",
+      "curseforge": "ftb-library-forge",
+      "github": "FTBTeam/FTB-Library",
+      "required": true,
+      "group": "ftb",
+      "why": "Shared UI/config library for every FTB mod.",
+      "github_asset": "^ftb-library-neoforge-.*\\\\.jar$"
+    },
+    {
+      "name": "FTB Teams",
+      "id": "ftb-teams",
+      "curseforge": "ftb-teams-forge",
+      "github": "FTBTeam/FTB-Teams",
+      "required": true,
+      "group": "ftb",
+      "why": "Team/progress backend for FTB Quests.",
+      "github_asset": "^ftb-teams-neoforge-.*\\\\.jar$"
+    },
+    {
+      "name": "FTB Quests",
+      "id": "ftb-quests",
+      "curseforge": "ftb-quests-forge",
+      "github": "FTBTeam/FTB-Quests",
+      "required": true,
+      "group": "ftb",
+      "why": "The quest book (two chapters: Welcome + Stone Age).",
+      "github_asset": "^ftb-quests-neoforge-.*\\\\.jar$"
+    },
+    {
+      "name": "FTB Ultimine",
+      "id": "ftb-ultimine",
+      "curseforge": "ftb-ultimine-forge",
+      "github": "FTBTeam/FTB-Ultimine",
+      "required": true,
+      "group": "ftb",
+      "why": "Vein-mining through the solid stone world (a QoL must for stone packs).",
+      "github_asset": "^ftb-ultimine-neoforge-.*\\\\.jar$"
+    },
+    {
+      "name": "Mekanism",
+      "id": "mekanism",
+      "curseforge": "mekanism",
+      "github": "mekanism/Mekanism",
+      "required": true,
+      "group": "tech",
+      "why": "Main tech progression (ore processing -> energy -> digital miner).",
+      "github_asset_prefixes": [
+        "Mekanism"
+      ],
+      "github_asset": "^Mekanism-1\\\\.21\\\\.1-.*\\\\.jar$"
+    },
+    {
+      "name": "Applied Energistics 2",
+      "id": "ae2",
+      "curseforge": "applied-energistics-2",
+      "github": "AppliedEnergistics/Applied-Energistics-2",
+      "required": true,
+      "group": "tech",
+      "why": "Storage/autocrafting endgame.",
+      "github_asset": "^(app)?liedenergistics2?-.*\\\\.jar$"
+    },
+    {
+      "name": "GuideME",
+      "id": "guideme",
+      "curseforge": "guideme",
+      "github": "AppliedEnergistics/GuideME",
+      "required": true,
+      "group": "core",
+      "why": "Hard dependency of Applied Energistics 2 on 1.21.1 (it is the in-game guide engine)."
+    },
+    {
+      "name": "Powah",
+      "id": "powah",
+      "curseforge": "powah",
+      "github": "owmii/Powah",
+      "required": true,
+      "group": "tech",
+      "why": "Early/mid game energy generation."
+    },
+    {
+      "name": "Ender IO",
+      "id": "enderio",
+      "curseforge": "ender-io",
+      "github": "Team-EnderIO/EnderIO",
+      "required": false,
+      "group": "tech",
+      "why": "Conduits + machines; heavy dependency chain, optional if it misbehaves.",
+      "github_asset": "^enderio-.*\\\\.jar$"
+    },
+    {
+      "name": "Mystical Agriculture",
+      "id": "mystical-agriculture",
+      "curseforge": "mystical-agriculture",
+      "required": true,
+      "group": "tech",
+      "why": "Resource crops - the sustainable way to get ores without a world."
+    },
+    {
+      "name": "Cucumber Library",
+      "id": "cucumber",
+      "curseforge": "cucumber-library",
+      "required": true,
+      "group": "tech",
+      "why": "Dependency of Mystical Agriculture."
+    },
+    {
+      "name": "Industrial Foregoing",
+      "id": "industrial-foregoing",
+      "curseforge": "industrial-foregoing",
+      "github": "InnovativeOnlineIndustries/Industrial-Foregoing",
+      "required": true,
+      "group": "tech",
+      "why": "Laser drills, mob farms, resource automation.",
+      "github_asset": "^(industrialforegoing|IndustrialForegoing)-.*\\\\.jar$"
+    },
+    {
+      "name": "Titanium",
+      "id": "titanium",
+      "curseforge": "titanium",
+      "required": true,
+      "group": "tech",
+      "why": "Dependency of Industrial Foregoing."
+    },
+    {
+      "name": "Functional Storage",
+      "id": "functional-storage",
+      "curseforge": "functional-storage",
+      "required": true,
+      "group": "tech",
+      "why": "Drawers - cheap bulk storage for pebbles/gravel/dust."
+    },
+    {
+      "name": "Pipez",
+      "id": "pipez",
+      "curseforge": "pipez",
+      "required": true,
+      "group": "tech",
+      "why": "Simple item/fluid/energy pipes."
+    },
+    {
+      "name": "Sophisticated Backpacks",
+      "id": "sophisticated-backpacks",
+      "curseforge": "sophisticated-backpacks",
+      "required": true,
+      "group": "tech",
+      "why": "Portable storage for long mining trips."
+    },
+    {
+      "name": "Sophisticated Core",
+      "id": "sophisticated-core",
+      "curseforge": "sophisticated-core",
+      "required": true,
+      "group": "tech",
+      "why": "Dependency of Sophisticated Backpacks."
+    },
+    {
+      "name": "Cobble For Days",
+      "id": "cobblefordays",
+      "search": "cobble for days",
+      "curseforge": "cobble-for-days",
+      "required": false,
+      "group": "tech",
+      "why": "Compact cobblestone generator. If it is not available for 1.21.1 NeoForge, Ex Deorum's barrel + lava + water setup covers it."
+    },
+    {
+      "name": "Embeddium",
+      "id": "embeddium",
+      "curseforge": "embeddium",
+      "required": false,
+      "group": "optimization",
+      "why": "Renderer replacement (Sodium port for NeoForge)."
+    },
+    {
+      "name": "Sodium",
+      "id": "sodium",
+      "curseforge": "sodium",
+      "required": false,
+      "group": "optimization",
+      "why": "Alternative renderer - install this OR Embeddium, never both."
+    },
+    {
+      "name": "Ferrite Core",
+      "id": "ferrite-core",
+      "curseforge": "ferrite-core",
+      "github": "malte0811/FerriteCore",
+      "required": true,
+      "group": "optimization",
+      "why": "Big memory usage reduction.",
+      "github_asset": "^ferritecore-.*\\\\.jar$"
+    },
+    {
+      "name": "ModernFix",
+      "id": "modernfix",
+      "curseforge": "modernfix",
+      "github": "embeddedt/ModernFix",
+      "required": true,
+      "group": "optimization",
+      "why": "Faster startup and lower memory usage.",
+      "github_asset": "^modernfix-neoforge-.*mc1\\\\.21\\\\.1.*\\\\.jar$"
+    },
+    {
+      "name": "ImmediatelyFast",
+      "id": "immediatelyfast",
+      "curseforge": "immediatelyfast",
+      "github": "RaphiMC/ImmediatelyFast",
+      "required": true,
+      "group": "optimization",
+      "why": "Faster immediate-mode rendering (FPS).",
+      "github_asset": "^ImmediatelyFast-NeoForge-.*\\\\+1\\\\.21\\\\.1\\\\.jar$"
+    }
+  ]
+}
