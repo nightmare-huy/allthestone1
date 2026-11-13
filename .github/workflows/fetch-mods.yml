@@ -76,7 +76,15 @@ jobs:
         run: |
           set -e
           gh release delete mods-latest --yes --cleanup-tag || true
-          notes="Automatic build of all All The Stone 1 mods for Minecraft 1.21.1 / NeoForge $(date -u +%Y-%m-%d)."
+          {
+            echo "Automatic build for Minecraft 1.21.1 / NeoForge ($(date -u +%Y-%m-%d))."
+            echo
+            echo "## Resolution log"
+            echo '```'
+            grep -vE '^\s*$' download-log.txt | tail -80 || true
+            echo '```'
+          } > release-notes.md
+          notes="$(cat release-notes.md)"
           gh release create mods-latest \
             --title "Mods (1.21.1 / NeoForge, $(date -u +%Y-%m-%d))" \
             --notes "$notes" \
