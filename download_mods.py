@@ -297,7 +297,8 @@ def maven_lookup(mod: dict, mc: str, loader: str) -> dict | None:
     for v in versions:
         # a Maven version string alone does not identify the MC version unless it carries
         # "1.21.1"/"mc1.21.1"; catalogs that use the <mc>.<build> scheme set version_regex
-        if not mc_in(v, mc) and not cfg.get("version_regex"):
+        if not (mc_in(v, mc) or cfg.get("version_regex") or cfg.get("version_prefix")
+                or cfg.get("allow_loose")):
             continue
         if "snapshot" in v.lower() or "-alpha" in v.lower():
             continue
@@ -313,6 +314,9 @@ def maven_lookup(mod: dict, mc: str, loader: str) -> dict | None:
     if cfg.get("version_regex"):
         # the catalog knows the version series, e.g. JEI 19.x = MC 1.21.x
         wanted = [v for v in wanted if re.match(cfg["version_regex"], v)]
+    elif cfg.get("version_prefix"):
+        # FTB versioning: "20xx" = MC 1.20.x, "2101" = MC 1.21.1
+        wanted = [v for v in wanted if v.startswith(cfg["version_prefix"])]
     elif cfg.get("allow_loose"):
         wanted = [v for v in wanted
                   if MC_IN_TEXT_RE.search(v) or MC_VERSION_RE.match(v) or mc in v]

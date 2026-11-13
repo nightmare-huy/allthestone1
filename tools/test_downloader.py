@@ -79,6 +79,19 @@ check("Mekanism resolved", rec is not None)
 if rec:
     check("Mekanism 1.21.1 build", rec["version"] == "1.21.1-10.7.19.85", rec["version"])
 
+print("- maven: FTB uses 2101.x for MC 1.21.1")
+FTB_META = ("<metadata><versions><version>2101.1.0</version><version>2001.4.9</version>"
+            "<version>2100.1.4</version><version>1902.5.10</version></versions></metadata>")
+dm.http_text = lambda url: FTB_META
+dm.url_exists = lambda url: True
+ftb = {"name": "FTB Quests", "id": "ftb-quests", "maven": {
+    "repo": "https://maven.saps.dev/releases", "group": "dev/ftb/mods",
+    "artifact": "ftb-quests-neoforge", "version_prefix": "2101"}}
+rec = dm.maven_lookup(ftb, "1.21.1", "neoforge")
+check("FTB Quests resolved", rec is not None)
+if rec:
+    check("FTB 2101.x picked", rec["version"] == "2101.1.0", rec["version"])
+
 # ---------------------------------------------------------------------------------------
 print("- github asset matching")
 mek_mod = {"github_asset_prefixes": ["Mekanism"]}
