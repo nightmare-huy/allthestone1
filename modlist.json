@@ -169,7 +169,7 @@
       "required": false,
       "group": "tech",
       "why": "Conduits + machines; heavy dependency chain, optional if it misbehaves.",
-      "github_asset": "^enderio-.*\\.jar$"
+      "github_asset": "^enderio-.*1\\.21\\.1.*\\.jar$"
     },
     {
       "name": "Mystical Agriculture",
