@@ -1,0 +1,80 @@
+name: fetch-mods
+
+# This machine has no access to cdn.modrinth.com / forgecdn / maven / release-assets,
+# so the jars are downloaded here (a runner with normal internet) and published as
+# release assets of this repository. After that, anyone can build the instance with
+#     python3 download_mods.py --from-release
+# even from behind a filtering proxy, because api.github.com is reachable everywhere.
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "modlist.json"
+      - "download_mods.py"
+      - ".github/workflows/fetch-mods.yml"
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * 1"   # every Monday, pick up new builds
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fetch-mods
+  cancel-in-progress: true
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download every jar (Modrinth -> CurseForge -> Maven -> GitHub)
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+        run: python3 download_mods.py
+
+      - name: Report
+        run: |
+          echo "### jars in mods/" >> "$GITHUB_STEP_SUMMARY"
+          ls -la mods/*.jar 2>/dev/null | wc -l >> "$GITHUB_STEP_SUMMARY" || true
+          if [ -f MISSING_MODS.md ]; then
+            cat MISSING_MODS.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "files: $(ls mods/*.jar 2>/dev/null | wc -l)"
+
+      - name: Verify the jars are real archives (not HTML error pages)
+        run: |
+          set -e
+          bad=0
+          for f in mods/*.jar; do
+            [ -e "$f" ] || continue
+            if ! python3 -c "import zipfile,sys;zipfile.ZipFile(sys.argv[1]).testzip()" "$f"; then
+              echo "not a valid jar: $f"; bad=$((bad+1)); rm -f "$f"
+            fi
+          done
+          echo "invalid jars removed: $bad"
+
+      - name: Build the importable .mrpack
+        run: |
+          mkdir -p dist
+          python3 download_mods.py --mrpack dist/allthestone1-1.0.0.mrpack || true
+          ls -la dist
+
+      - name: Publish everything to the mods-latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          gh release delete mods-latest --yes --cleanup-tag || true
+          notes="Automatic build of all All The Stone 1 mods for Minecraft 1.21.1 / NeoForge $(date -u +%Y-%m-%d)."
+          gh release create mods-latest \
+            --title "Mods (1.21.1 / NeoForge, $(date -u +%Y-%m-%d))" \
+            --notes "$notes" \
+            mods/*.jar dist/*.mrpack MISSING_MODS.md mods/installed.json mods/manifest.json
+          gh release view mods-latest --json assets --jq '.assets[].name' | sort

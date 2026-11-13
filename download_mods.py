@@ -32,11 +32,17 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import subprocess
 import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 MODS_DIR = ROOT / "mods"
+
+# Preference order. Every entry is an independent ecosystem, so one dead host cannot
+# break the build: modrinth | curseforge | maven | github | release (this repo's release
+# assets, see release_lookup). Override with --prefer or ATS_SOURCES.
+DEFAULT_ORDER = "modrinth,curseforge,maven,github"
 CATALOG = ROOT / "modlist.json"
 MANIFEST = MODS_DIR / "manifest.json"
 MISSING_REPORT = ROOT / "MISSING_MODS.md"
@@ -45,12 +51,13 @@ USER_AGENT = "allthestone1-modpack-builder/1.0 (github.com/nightmare-huy/allthes
 TIMEOUT = 45
 RETRIES = 2
 
+REPO = os.environ.get("ATS_REPO") or "nightmare-huy/allthestone1"   # overridden by git remote
 MODRINTH = "https://api.modrinth.com/v2"
 CURSEFORGE = "https://api.curseforge.com/v1"
 GITHUB = "https://api.github.com"
 
 # Set to False automatically when a host is unreachable, so we do not wait for timeouts 30 times
-AVAILABLE = {"modrinth": True, "curseforge": True, "github": True}
+AVAILABLE = {"modrinth": True, "curseforge": True, "github": True, "maven": True, "html": True}
 MAVEN_HOSTS = ("maven.blamejared.com", "maven.architectury.dev", "modmaven.dev", "maven.saps.dev")
 
 
@@ -67,8 +74,21 @@ def host_of(url: str) -> str:
     return "cdn"
 
 
+def api_of(url: str) -> str:
+    """Which *API* group a URL belongs to (used for the availability cache)."""
+    if url.startswith(MODRINTH):
+        return "modrinth"
+    if url.startswith(CURSEFORGE):
+        return "curseforge"
+    if url.startswith(GITHUB):
+        return "github"
+    if any(h in url for h in MAVEN_HOSTS):
+        return "maven"
+    return "html"
+
+
 def http_json(url: str, headers: dict | None = None):
-    host = host_of(url)
+    host = api_of(url)
     if host in AVAILABLE and not AVAILABLE[host]:
         return None            # this API is unreachable from here, do not waste time (again)
     hdrs = {"User-Agent": USER_AGENT, "Accept": "application/json"}
@@ -85,7 +105,8 @@ def http_json(url: str, headers: dict | None = None):
                 return None
             last = e
             if e.code in (403, 429):
-                time.sleep(1.5 * (attempt + 1))
+                # rate limited (GitHub unauthenticated = 60 req/h) - back off, keep trying
+                time.sleep(2.0 * (attempt + 1))
                 continue
             break
         except Exception as e:  # noqa: BLE001 - network can fail in many ways
@@ -103,6 +124,36 @@ def http_json(url: str, headers: dict | None = None):
 
 
 CDN_FAILURES = {"count": 0}
+
+# Prefixes tried in order when a CDN is unreachable (self-hosted proxies / mirrors).
+# ATS_MIRRORS="/opt/mirror/,https://mirror.example.com/" reuses a local cache of the CDN.
+MIRRORS = [m.strip().rstrip("/") + "/" for m in os.environ.get("ATS_MIRRORS", "").split(",")
+           if m.strip()]
+
+
+def http_bytes(url: str, headers: dict | None = None) -> bytes | None:
+    """Plain GET that returns bytes (used for HTML pages and small API fallbacks)."""
+    host = api_of(url)
+    if host in AVAILABLE and not AVAILABLE[host]:
+        return None
+    hdrs = {"User-Agent": USER_AGENT, "Accept": "text/html,application/json,*/*"}
+    if headers:
+        hdrs.update(headers)
+    try:
+        req = urllib.request.Request(url, headers=hdrs)
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+            return r.read()
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None
+        if e.code in (403, 429):
+            time.sleep(2.0)
+            return None
+        return None
+    except Exception:  # noqa: BLE001
+        if host in AVAILABLE:
+            AVAILABLE[host] = False
+        return None
 
 
 def download_file(url: str, dest: Path, expected_sha512: str | None = None,
@@ -136,6 +187,108 @@ def download_file(url: str, dest: Path, expected_sha512: str | None = None,
 
     tmp.replace(dest)
     return True
+
+
+def download_with_mirrors(url: str, dest: Path, expected_sha512: str | None = None,
+                          mirrors: list[str] | None = None) -> tuple[bool, str | None]:
+    """
+    Try `url` and then every mirror until one returns the file.
+
+    Returns (ok, working_prefix). `working_prefix` is "" for the original URL or the
+    mirror prefix that worked, so the caller can rewrite every remaining download -
+    these sandboxes usually block all CDNs, and a known-good host saves a lot of time.
+    """
+    candidates = [("", url)]
+    for prefix in mirrors or []:
+        if prefix and not url.startswith(prefix):
+            candidates.append((prefix, prefix + url))
+    for prefix, candidate in candidates:
+        if download_file(candidate, dest, expected_sha512):
+            return True, prefix
+        if candidate != url and not dest.exists():
+            continue
+    return False, None
+
+
+def download_asset_by_id(mod: dict, asset_id: int, dest: Path, expected_sha512: str | None = None) -> bool:
+    """
+    GitHub does not always hand out a browser_download_url (and it is always on the
+    blocked release-assets host), but `Accept: application/octet-stream` on
+    /releases/assets/<id> streams the bytes from api.github.com itself.
+    """
+    url = f"{GITHUB}/repos/{mod['github']}/releases/assets/{asset_id}"
+    headers = {"Accept": "application/octet-stream", "User-Agent": USER_AGENT}
+    tmp = dest.with_suffix(dest.suffix + ".part")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=TIMEOUT * 3) as r, open(tmp, "wb") as f:
+            shutil.copyfileobj(r, f, 1024 * 256)
+    except Exception as e:  # noqa: BLE001
+        print(f"    ! asset download failed: {e}")
+        tmp.unlink(missing_ok=True)
+        return False
+    if expected_sha512:
+        h = hashlib.sha512()
+        with open(tmp, "rb") as f:
+            for chunk in iter(lambda: f.read(1024 * 512), b""):
+                h.update(chunk)
+        if h.hexdigest().lower() != expected_sha512.lower():
+            print("    ! checksum mismatch, discarding file")
+            tmp.unlink(missing_ok=True)
+            return False
+    tmp.replace(dest)
+    return True
+
+
+def modrinth_versions_html(slug: str, mc: str, loader: str) -> list[dict] | None:
+    """
+    Last-resort Modrinth access: the plain HTML page lists file links, so it also works
+    when api.modrinth.com is blocked but modrinth.com is not.
+    """
+    body = http_bytes(f"https://modrinth.com/mod/{urllib.parse.quote(slug)}/versions"
+                      f"?g={urllib.parse.quote(mc)}&l={urllib.parse.quote(json.dumps([loader]))}")
+    if not body:
+        return None
+    html = body.decode("utf-8", "replace")
+    found = []
+    for m in re.finditer(r'https://cdn\.modrinth\.com/data/[^"\s\\]+?\.jar', html):
+        url = m.group(0)
+        found.append({"version_number": url.rsplit("/", 1)[-1], "version_type": "release",
+                      "files": [{"primary": True, "url": url, "filename": url.rsplit("/", 1)[-1],
+                                 "hashes": {}}]})
+    return found or None
+
+
+def curseforge_files_html(slug: str, mc: str, loader: str) -> list[dict] | None:
+    """
+    CurseForge fallback without an API key: scrape the project's files page for
+    /files/<id> links and resolve the CDN URL from the file page itself.
+    """
+    body = http_bytes(f"https://www.curseforge.com/minecraft/mc-mods/{urllib.parse.quote(slug)}"
+                      f"/files/all?page=1&pageSize=50&gameVersionTypeId=1.21.1")
+    if not body:
+        return None
+    html = body.decode("utf-8", "replace")
+    ids = []
+    for m in re.finditer(r"/files/(\d+)", html):
+        fid = m.group(1)
+        if fid not in ids:
+            ids.append(fid)
+    return [{"fileId": int(i)} for i in ids[:20]] or None
+
+
+def curseforge_file_page_url(slug: str, file_id: int) -> str | None:
+    body = http_bytes(f"https://www.curseforge.com/minecraft/mc-mods/{urllib.parse.quote(slug)}/files/{file_id}")
+    if not body:
+        return None
+    html = body.decode("utf-8", "replace")
+    m = re.search(r'"downloadUrl"\s*:\s*"([^"]+)"', html) or \
+        re.search(r'https://(?:edge|media)\.forgecdn\.net/[^"\s]+?\.jar', html)
+    if not m:
+        return None
+    url = m.group(1) if m.groups() else m.group(0)
+    return url.replace("\\/", "/")
 
 
 # --------------------------------------------------------------------------------------
@@ -458,6 +611,31 @@ def github_lookup(mod: dict, mc: str, loader: str) -> dict | None:
             "confidence": "high" if score >= 15 else "medium"}
 
 
+def release_lookup(mod: dict, mc: str, loader: str) -> dict | None:
+    """
+    Look for the jar in this repository's own releases.
+
+    The GitHub Actions workflow (.github/workflows/build-mrpack.yml) runs
+    download_mods.py on a machine with real internet access and uploads every resolved
+    jar to a release, so builds behind a filtering proxy can still fetch the files from
+    api.github.com (which is always reachable here).
+    """
+    tag = os.environ.get("ATS_RELEASE_TAG") or "mods-latest"
+    data = http_json(f"{GITHUB}/repos/{REPO}/releases/tags/{tag}")
+    if not data:
+        return None
+    assets = data.get("assets") or []
+    wanted = [a for a in assets
+              if a.get("name", "").lower().endswith(".jar")
+              and asset_pattern(mod, mod.get("github") or "", a["name"])]
+    if not wanted:
+        return None
+    asset = wanted[0]
+    return {"version": "release-asset", "url": asset["browser_download_url"],
+            "filename": asset["name"], "sha512": None, "source": "release",
+            "asset_id": asset.get("id"), "id": REPO, "project": REPO, "title": mod["name"]}
+
+
 # --------------------------------------------------------------------------------------
 # manifest / report writers
 # --------------------------------------------------------------------------------------
@@ -579,6 +757,10 @@ def main() -> int:
     ap.add_argument("--loader", default=None, help="override loader")
     ap.add_argument("--mrpack", nargs="?", const="allthestone1-1.0.0.mrpack", default=None,
                     help="only resolve versions and write an importable Modrinth pack (.mrpack)")
+    ap.add_argument("--prefer", default=os.environ.get("ATS_SOURCES", DEFAULT_ORDER),
+                    help=f"comma separated source order (default: {DEFAULT_ORDER})")
+    ap.add_argument("--from-release", dest="prefer_release", action="store_true",
+                    help="try this repository's release assets first (see .github/workflows)")
     args = ap.parse_args()
 
     if not CATALOG.exists():
@@ -609,31 +791,63 @@ def main() -> int:
         record = None
         reasons = []
 
-        # 1) Modrinth by slug, then by search
-        record = modrinth_lookup(slug, mc, loader)
-        if not record and mod.get("search"):
-            print("    ~ not found by slug, searching modrinth")
-            record = modrinth_search(mod["search"], mc, loader)
-        if not record:
-            reasons.append("no Modrinth 1.21.1 neoforge build reachable")
+        # The order is a preference list: at least 4 independent ecosystems are used,
+        # so a blocked/down host only costs speed, never the whole pack.
+        order = [s_.strip() for s_ in (args.prefer or DEFAULT_ORDER).split(",") if s_.strip()]
+        if args.prefer_release:
+            order.insert(0, "release")
+        for source in order:
+            if record:
+                break
 
-        # 2) CurseForge
-        if not record:
-            record = curseforge_lookup(mod, mc, loader)
-            if not record:
-                reasons.append("no CurseForge build (or CF_API_KEY not set)")
+            if source == "modrinth":
+                record = modrinth_lookup(slug, mc, loader)
+                if not record and mod.get("search"):
+                    print("    ~ not found by slug, searching modrinth")
+                    record = modrinth_search(mod["search"], mc, loader)
+                if not record:
+                    record = modrinth_versions_html(slug, mc, loader)
+                    if record:
+                        record = pick_modrinth_version(record, mc, loader)
+                        record = record and {**record, "source": "modrinth-html",
+                                             "project": slug, "title": mod["name"]}
+                if not record:
+                    reasons.append("modrinth: no 1.21.1 neoforge build")
 
-        # 3) Public Maven repository (JEI, Architectury, Mekanism, ...)
-        if not record:
-            record = maven_lookup(mod, mc, loader)
-            if not record:
-                reasons.append("no matching Maven artifact")
+            elif source == "curseforge":
+                record = curseforge_lookup(mod, mc, loader)
+                if not record and mod.get("curseforge"):
+                    cf_slug = str(mod["curseforge"])
+                    for entry in (curseforge_files_html(cf_slug, mc, loader) or [])[:10]:
+                        url = curseforge_file_page_url(cf_slug, entry["fileId"])
+                        if url:
+                            record = {"version": f"file {entry['fileId']}", "url": url,
+                                      "filename": url.rsplit("/", 1)[-1], "sha512": None,
+                                      "source": "curseforge-html", "id": mod.get("curseforge"),
+                                      "project": cf_slug, "title": mod["name"]}
+                            break
+                if not record:
+                    reasons.append("curseforge: no build (CF_API_KEY not set / page blocked)")
 
-        # 4) GitHub release assets
-        if not record:
-            record = github_lookup(mod, mc, loader)
-            if not record:
-                reasons.append("no matching GitHub release asset")
+            elif source == "maven":
+                record = maven_lookup(mod, mc, loader)
+                if not record:
+                    reasons.append("maven: no matching artifact")
+
+            elif source == "github":
+                record = github_lookup(mod, mc, loader)
+                if not record:
+                    reasons.append("github: no matching release asset")
+
+            elif source == "release":
+                record = release_lookup(mod, mc, loader)
+                if not record:
+                    reasons.append("release: not in the repo's own release assets")
+            else:
+                reasons.append(f"unknown source {source}")
+
+        if record and getattr(args, "prefer_release", False) and record.get("source") not in ("github", "release"):
+            pass  # explicit release lookup already happened first via --prefer
 
         if not record:
             print("    x unavailable:", "; ".join(reasons))
@@ -655,8 +869,18 @@ def main() -> int:
             installed.append({**record, "title": mod["name"], "filename": fname})
             continue
 
-        if download_file(record["url"], dest, record.get("sha512"),
-                         track_failures=record["source"] != "maven"):
+        ok = False
+        if record["source"] == "release" and record.get("asset_id"):
+            # straight from api.github.com: works even when every CDN is filtered
+            ok = download_asset_by_id({**mod, "github": REPO}, record["asset_id"], dest,
+                                      record.get("sha512"))
+        if not ok:
+            ok, prefix = download_with_mirrors(record["url"], dest, record.get("sha512"),
+                                               MIRRORS)
+            if ok and prefix:
+                print(f"    = downloads go through the mirror {prefix}")
+                MIRRORS.insert(0, prefix)
+        if ok:
             installed.append({**record, "title": mod["name"], "filename": fname})
         else:
             print("    x download failed, falling back to the next source")
