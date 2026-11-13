@@ -8,37 +8,73 @@ Ex Deorum (молот → сито → галька/гравий/песок/пы
 
 ---
 
-## 1. Как запустить (3 шага)
+## 1. Как запустить
+
+Jar-файлы **уже собраны** и лежат в релизе репозитория
+(`mods-latest`, 29 модов) и в ветке `mods-store`. Выбери любой способ.
+
+### Вариант A — забрать готовое (быстро, ничего не скачивая с CDN)
 
 ```bash
-# 1) скачать моды (Modrinth -> CurseForge -> GitHub releases)
-python3 download_mods.py
+git clone https://github.com/nightmare-huy/allthestone1.git allthestone1
+cd allthestone1
+git fetch origin mods-store
+git archive FETCH_HEAD mods | tar -x      # 29 jar-ов, ~63 МБ
+python3 tools/check_mods.py               # проверка зависимостей внутри jar-ов
+```
 
-# 2) проверить, что все файлы сборки валидны
+### Вариант B — скачать самому из 5 источников
+
+```bash
+python3 download_mods.py                  # Modrinth -> CurseForge -> Maven -> GitHub -> релиз
+python3 tools/check_mods.py
 python3 tools/validate_pack.py
-
-# 3) положить папку как instance:
-#    <instance>/mods, <instance>/config, <instance>/kubejs
 ```
 
-Дальше — установить **NeoForge 21.1.266** для 1.21.1 (https://neoforged.net/),
-выделить **4–6 ГБ RAM** и запустить.
+Порядок источников можно менять: `--prefer maven,modrinth,github` или
+`--from-release` (забирать из релиза этого репозитория, единственный источник,
+который работает при заблокированных CDN — файлы идут через `api.github.com`).
 
-> Если `download_mods.py` не смог достать часть модов (например, сетевая песочница
-> блокирует `cdn.modrinth.com` и `mediafilez.forgecdn.net`), он пишет список
-> **`MISSING_MODS.md`** с прямыми ссылками. Скачай их руками в `mods/` и запусти
-> скрипт снова — он докачает только отсутствующее.
-
-### Ключ CurseForge (необязательно, но сильно помогает)
+### Вариант C — импорт в лаунчер
 
 ```bash
-export CF_API_KEY="<твой ключ с https://console.curseforge.com/>"
+python3 download_mods.py --mrpack allthestone1-1.0.0.mrpack
+```
+
+Файл `allthestone1-1.0.0.mrpack` (он же лежит в релизе) импортируется в
+Prism / ATLauncher / Modrinth App: лаунчер сам скачает ровно те версии модов,
+а `config/` и `kubejs/` уже внутри архива.
+
+Дальше — **NeoForge 21.1.266** для 1.21.1 (https://neoforged.net/), **4–6 ГБ RAM**, запуск.
+
+### Источники, которые реально используются
+
+| Источник | Что берётся | Ключ |
+| --- | --- | --- |
+| Modrinth API + HTML-страница версий | 24 из 29 модов | нет |
+| Maven `maven.ftb.dev` (FTB Library/Teams/Quests/Ultimine), `maven.blamejared.com` (JEI), `modmaven.dev` (Mekanism) | 4 FTB + резерв для JEI/Mekanism | нет |
+| GitHub releases (`api.github.com`) | резерв, в т.ч. `Accept: application/octet-stream` по asset id | нет (60 req/ч) |
+| CurseForge API и files-страница | резерв для модов, которых нет на Modrinth | `CF_API_KEY` (для API) |
+| Собственный релиз `mods-latest` / ветка `mods-store` | всё, если CDN недоступны | нет |
+
+### Ключ CurseForge (необязательно)
+
+```bash
+export CF_API_KEY="<ключ с https://console.curseforge.com/>"
 python3 download_mods.py
 ```
 
-Без ключа источник CurseForge просто пропускается (в логе будет
-`no CurseForge build (or CF_API_KEY not set)`), и скрипт идёт дальше по списку
-Modrinth → GitHub.
+Без ключа CurseForge пропускается (в логе — `curseforge: no build`), скрипт идёт дальше.
+
+### Если сеть фильтрует CDN (как в этой песочнице)
+
+Здесь проходят только `api.github.com`, `github.com` (git) и прокси для чтения
+страниц — `cdn.modrinth.com`, `mediafilez.forgecdn.net`, maven-хосты и
+`release-assets.githubusercontent.com` блокируются на TLS. Поэтому jar-ы
+собираются GitHub Actions (`.github/workflows/fetch-mods.yml`, там интернет есть),
+публикуются релизом и дублируются в ветку `mods-store`; забирать их — способом A.
+Внутри workflow jar-ы проверяются на целостность (`zipfile.testzip`) и
+отбрасываются, если CDN вернул HTML-страницу вместо файла.
 
 ---
 
@@ -56,8 +92,12 @@ Modrinth → GitHub.
 | `kubejs/server_scripts/stone_block_spawn.js` | комната 5×5×5 на `0 64 0`, телепорт при первом входе, `setworldspawn`, защита от «задохнуться в камне» |
 | `kubejs/server_scripts/progression.js` | галька (shift + ПКМ пустой рукой, 50%) и стартовые рецепты |
 | `tools/validate_pack.py` | проверка JSON/SNBT/квестов/скриптов без запуска игры |
+| `tools/check_mods.py` | разбор `META-INF/neoforge.mods.toml` в каждом jar: дубликаты modId, отсутствующие required-зависимости, объявленные `incompatible`, битые архивы |
+| `tools/test_downloader.py` | офлайн-тесты выбора версий (Maven/Modrinth/GitHub), не требует сети |
+| `.github/workflows/fetch-mods.yml` | скачивает jar-ы на раннере с интернетом, публикует релиз `mods-latest` и ветку `mods-store` |
+| `.github/workflows/check-pack.yml` | CI-проверка сборки: worldgen, квесты, KubeJS, каталог модов, тесты загрузчика |
 
-### Моды (30 позиций в каталоге)
+### Моды (29 позиций в каталоге)
 
 * **Основа:** Ex Deorum, KubeJS, Rhino, Architectury API, JEI, Jade, Better Advanced Tooltips
 * **FTB:** FTB Library, FTB Teams, FTB Quests, FTB Ultimine

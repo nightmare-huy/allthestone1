@@ -28,9 +28,26 @@ python3 tools/test_downloader.py    # логика выбора версий (о
 
 ---
 
+## 📦 Моды уже скачаны
+
+29 jar-ов для 1.21.1 / NeoForge собраны CI и лежат в:
+* релизе **`mods-latest`** этого репозитория (+ `allthestone1-1.0.0.mrpack` и `installed.json`);
+* ветке **`mods-store`** (только jar-ы, чтобы забирать по git-протоколу):
+
+```bash
+git fetch origin mods-store
+git archive FETCH_HEAD mods | tar -x
+python3 tools/check_mods.py     # 29 mod ids, 0 ошибок, 0 предупреждений
+```
+
+CI-прогон `fetch-mods` скачал их с Modrinth (24) и Maven `maven.ftb.dev` (4 FTB-мода),
+плюс Mekanism/JEI через Maven-резерв; сборка повторяется при каждом изменении
+`modlist.json` и по расписанию (каждый понедельник).
+
 ## ⚠️ Ограничение этой песочницы (важно)
 
-Сеть здесь разрешает **только** `api.github.com` (плюс прокси для чтения страниц).
+Сеть здесь разрешает **только** `api.github.com`, `github.com` (git) и прокси для чтения
+страниц.
 `cdn.modrinth.com`, `mediafilez.forgecdn.net`, `objects.githubusercontent.com`,
 `maven.blamejared.com` и т.п. **закрыты на уровне TLS**, поэтому **ни один `.jar`
 физически не скачался** — это ограничение окружения, а не скрипта.
