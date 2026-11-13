@@ -85,10 +85,10 @@
       "why": "Shared UI/config library for every FTB mod.",
       "github_asset": "^ftb-library-neoforge-.*\\.jar$",
       "maven": {
-        "repo": "https://maven.saps.dev/releases",
+        "repo": "https://maven.ftb.dev/releases",
         "group": "dev/ftb/mods",
         "artifact": "ftb-library-neoforge",
-        "version_prefix": "2101"
+        "version_regex": "^2101\\."
       }
     },
     {
@@ -101,10 +101,10 @@
       "why": "Team/progress backend for FTB Quests.",
       "github_asset": "^ftb-teams-neoforge-.*\\.jar$",
       "maven": {
-        "repo": "https://maven.saps.dev/releases",
+        "repo": "https://maven.ftb.dev/releases",
         "group": "dev/ftb/mods",
         "artifact": "ftb-teams-neoforge",
-        "version_prefix": "2101"
+        "version_regex": "^2101\\."
       }
     },
     {
@@ -117,10 +117,10 @@
       "why": "The quest book (two chapters: Welcome + Stone Age).",
       "github_asset": "^ftb-quests-neoforge-.*\\.jar$",
       "maven": {
-        "repo": "https://maven.saps.dev/releases",
+        "repo": "https://maven.ftb.dev/releases",
         "group": "dev/ftb/mods",
         "artifact": "ftb-quests-neoforge",
-        "version_prefix": "2101"
+        "version_regex": "^2101\\."
       }
     },
     {
@@ -133,10 +133,10 @@
       "why": "Vein-mining through the solid stone world (a QoL must for stone packs).",
       "github_asset": "^ftb-ultimine-neoforge-.*\\.jar$",
       "maven": {
-        "repo": "https://maven.saps.dev/releases",
+        "repo": "https://maven.ftb.dev/releases",
         "group": "dev/ftb/mods",
         "artifact": "ftb-ultimine-neoforge",
-        "version_prefix": "2101"
+        "version_regex": "^2101\\."
       }
     },
     {

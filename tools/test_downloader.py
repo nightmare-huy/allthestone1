@@ -85,12 +85,12 @@ FTB_META = ("<metadata><versions><version>2101.1.0</version><version>2001.4.9</v
 dm.http_text = lambda url: FTB_META
 dm.url_exists = lambda url: True
 ftb = {"name": "FTB Quests", "id": "ftb-quests", "maven": {
-    "repo": "https://maven.saps.dev/releases", "group": "dev/ftb/mods",
-    "artifact": "ftb-quests-neoforge", "version_prefix": "2101"}}
+    "repo": "https://maven.ftb.dev/releases", "group": "dev/ftb/mods",
+    "artifact": "ftb-quests-neoforge", "version_regex": r"^2101\."}}
 rec = dm.maven_lookup(ftb, "1.21.1", "neoforge")
 check("FTB Quests resolved", rec is not None)
 if rec:
-    check("FTB 2101.x picked", rec["version"] == "2101.1.0", rec["version"])
+    check("FTB 2101.x picked (not 26.1/2004)", rec["version"] == "2101.1.0", rec["version"])
 
 # ---------------------------------------------------------------------------------------
 print("- github asset matching")
