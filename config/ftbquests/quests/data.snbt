@@ -17,5 +17,6 @@
 	emergency_items_cooldown: 0,
 	lock_message: "",
 	fallback_locale: "en_us",
-	detection_delay: 20
+	detection_delay: 20,
+	presets: {}
 }
