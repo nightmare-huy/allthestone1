@@ -1,0 +1,51 @@
+name: check-pack
+
+# Validates the pack itself (no downloads involved): worldgen JSON, FTB Quests SNBT,
+# KubeJS syntax, mod catalog and the downloader's resolver logic.
+on:
+  push:
+    branches-ignore: [mods-store]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Pack structure / worldgen / quests / kubejs
+        run: python3 tools/validate_pack.py
+
+      - name: KubeJS syntax
+        run: |
+          for f in kubejs/server_scripts/*.js kubejs/startup_scripts/*.js; do
+            [ -e "$f" ] || continue
+            node --check "$f" && echo "ok $f"
+          done
+
+      - name: Downloader resolver logic (offline tests)
+        run: python3 tools/test_downloader.py
+
+      - name: Modlist sanity (ids, required fields, duplicate entries)
+        run: |
+          python3 - <<'EOF'
+          import json, sys
+          d = json.load(open("modlist.json"))
+          ids = [m["id"] for m in d["mods"]]
+          assert d["minecraft"] == "1.21.1", d["minecraft"]
+          assert d["loader"] == "neoforge", d["loader"]
+          assert len(ids) == len(set(ids)), "duplicate mod ids in modlist.json"
+          for m in d["mods"]:
+              assert m.get("name") and m.get("id"), m
+              assert m.get("why"), f"{m['id']}: missing 'why'"
+          print(f"ok: {len(ids)} mods, minecraft {d['minecraft']} / {d['loader']}")
+          EOF
