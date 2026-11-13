@@ -51,6 +51,7 @@ GITHUB = "https://api.github.com"
 
 # Set to False automatically when a host is unreachable, so we do not wait for timeouts 30 times
 AVAILABLE = {"modrinth": True, "curseforge": True, "github": True}
+MAVEN_HOSTS = ("maven.blamejared.com", "maven.architectury.dev", "modmaven.dev", "maven.saps.dev")
 
 
 # --------------------------------------------------------------------------------------
@@ -104,8 +105,9 @@ def http_json(url: str, headers: dict | None = None):
 CDN_FAILURES = {"count": 0}
 
 
-def download_file(url: str, dest: Path, expected_sha512: str | None = None) -> bool:
-    if CDN_FAILURES["count"] >= 2:
+def download_file(url: str, dest: Path, expected_sha512: str | None = None,
+                  track_failures: bool = True) -> bool:
+    if track_failures and CDN_FAILURES["count"] >= 2:
         print("    ! file downloads are blocked on this network, recording as manual download")
         return False
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -116,7 +118,8 @@ def download_file(url: str, dest: Path, expected_sha512: str | None = None) -> b
         with urllib.request.urlopen(req, timeout=TIMEOUT * 3) as r, open(tmp, "wb") as f:
             shutil.copyfileobj(r, f, 1024 * 256)
     except Exception as e:  # noqa: BLE001
-        CDN_FAILURES["count"] += 1
+        if track_failures:
+            CDN_FAILURES["count"] += 1
         print(f"    ! download failed: {e}")
         tmp.unlink(missing_ok=True)
         return False
@@ -271,8 +274,109 @@ def curseforge_lookup(mod: dict, mc: str, loader: str) -> dict | None:
             "id": f.get("modId"), "project": found.get("slug"), "title": found.get("name")}
 
 
+# --- Maven repositories ----------------------------------------------------------------
+def maven_lookup(mod: dict, mc: str, loader: str) -> dict | None:
+    """
+    Public Maven repositories used by 1.21.1 NeoForge mods (BlameJared for JEI,
+    Architectury's own repo, modmaven for Mekanism...). We read maven-metadata.xml,
+    pick the newest version that names the target MC version, and use the standard
+    <artifact>-<version>.jar path.
+    """
+    cfg = mod.get("maven")
+    if not cfg:
+        return None
+    repo = cfg["repo"].rstrip("/")
+    group = cfg["group"].strip("/")
+    artifact = cfg["artifact"]
+    meta_url = f"{repo}/{group}/{artifact}/maven-metadata.xml"
+    xml = http_text(meta_url)
+    if not xml:
+        return None
+    versions = re.findall(r"<version>([^<]+)</version>", xml)
+    wanted = []
+    for v in versions:
+        # a Maven version string alone does not identify the MC version unless it carries
+        # "1.21.1"/"mc1.21.1"; catalogs that use the <mc>.<build> scheme set version_regex
+        if not mc_in(v, mc) and not cfg.get("version_regex"):
+            continue
+        if "snapshot" in v.lower() or "-alpha" in v.lower():
+            continue
+        wanted.append(v)
+    if not wanted:
+        return None
+
+    # The maven metadata cannot tell MC versions apart, so the mod catalog decides which
+    # version series belongs to 1.21.1:
+    #   exact "1.21.1" or "mc1.21.1" in the version        -> claim it
+    #   "<mc>.x.y" style (e.g. 19.70.0.469 for MC 1.21.1)  -> only when allow_loose is set,
+    #                                                         and only "19.21.1"-headed values
+    if cfg.get("version_regex"):
+        # the catalog knows the version series, e.g. JEI 19.x = MC 1.21.x
+        wanted = [v for v in wanted if re.match(cfg["version_regex"], v)]
+    elif cfg.get("allow_loose"):
+        wanted = [v for v in wanted
+                  if MC_IN_TEXT_RE.search(v) or MC_VERSION_RE.match(v) or mc in v]
+    else:
+        # strict: only versions that literally name the MC version (Mekanism: 1.21.1-10.7.x)
+        wanted = [v for v in wanted if mc in v or MC_IN_TEXT_RE.search(v)]
+
+    wanted.sort(key=version_key)
+    for version in reversed(wanted[-5:]):
+        fn = cfg.get("filename", "{artifact}-{version}.jar").format(artifact=artifact, version=version)
+        url = f"{repo}/{group}/{artifact}/{version}/{fn}"
+        if url_exists(url):
+            return {"version": version, "url": url, "filename": fn, "sha512": None,
+                    "source": "maven", "id": repo, "project": artifact, "title": mod["name"]}
+    return None
+
+
+def http_text(url: str) -> str | None:
+    for attempt in range(2):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+            with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+                return r.read().decode("utf-8", "replace")
+        except Exception:  # noqa: BLE001
+            time.sleep(0.5)
+    return None
+
+
+def url_exists(url: str) -> bool:
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT}, method="HEAD")
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+            length = int(r.headers.get("Content-Length") or 0)
+            return 200 <= r.status < 300 and (length == 0 or length > 20_000)
+    except Exception:  # noqa: BLE001
+        return False
+
+
 # --- GitHub ----------------------------------------------------------------------------
 MC_TOKEN = re.compile(r"(?<!\d)1[._]21[._]1(?!\d)")
+MC_VERSION_RE = re.compile(r"(?<!\d)1\.21\.1(?!\d)")
+MC_IN_TEXT_RE = re.compile(r"(?<!\d)mc1\.21\.1(?!\d)")   # used to "claim" a version string
+
+
+def mc_in(text: str, mc: str, loose: bool = False) -> bool:
+    """
+    True when `text` names the target Minecraft version, with proper boundaries.
+
+    "exdeorum-3.12+1.21.1"  -> True
+    "Mekanism-1.21.1-10.7"  -> True
+    "mod-1.21.11.jar"       -> False   (1.21.11 is a different game version)
+    "mod-1.21.10.jar"       -> False
+    """
+    pattern = r"(?<![0-9])" + re.escape(mc) + r"(?![0-9.])"
+    if re.search(pattern, text):
+        return True
+    if MC_TOKEN.search(text):
+        return True
+    if loose and mc.count(".") == 2:
+        # "<mc>.<build>" versioning, e.g. 19.21.1.300 for MC 1.21.1 (JEI style)
+        return text.startswith(mc)
+    return False
+
+
 NEO_TOKEN = re.compile(r"(neoforge|neo)", re.I)
 
 
@@ -326,7 +430,7 @@ def github_lookup(mod: dict, mc: str, loader: str) -> dict | None:
             if asset.get("size", 0) < 20_000:
                 continue
             blob2 = f"{blob} {fn}"
-            mc_ok = bool(MC_TOKEN.search(blob2)) or re.search(re.escape(mc) + r"(?!\d)", blob2) is not None
+            mc_ok = mc_in(blob2, mc)
             if not mc_ok:
                 continue
             # the jar must belong to *this* project, not to a bundling sibling
@@ -515,7 +619,13 @@ def main() -> int:
             if not record:
                 reasons.append("no CurseForge build (or CF_API_KEY not set)")
 
-        # 3) GitHub release assets
+        # 3) Public Maven repository (JEI, Architectury, Mekanism, ...)
+        if not record:
+            record = maven_lookup(mod, mc, loader)
+            if not record:
+                reasons.append("no matching Maven artifact")
+
+        # 4) GitHub release assets
         if not record:
             record = github_lookup(mod, mc, loader)
             if not record:
@@ -541,7 +651,8 @@ def main() -> int:
             installed.append({**record, "title": mod["name"], "filename": fname})
             continue
 
-        if download_file(record["url"], dest, record.get("sha512")):
+        if download_file(record["url"], dest, record.get("sha512"),
+                         track_failures=record["source"] != "maven"):
             installed.append({**record, "title": mod["name"], "filename": fname})
         else:
             print("    x download failed, falling back to the next source")

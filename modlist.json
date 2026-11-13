@@ -11,7 +11,7 @@
       "required": true,
       "group": "core",
       "why": "Sieves, hammers, crooks, barrels and crucibles - the backbone of a stone world.",
-      "github_asset": "^exdeorum-.*\\\\.jar$"
+      "github_asset": "^exdeorum-.*\\.jar$"
     },
     {
       "name": "KubeJS",
@@ -22,7 +22,7 @@
       "required": true,
       "group": "core",
       "why": "Scripts for the stone world, the pebble mechanic and the progression recipes.",
-      "github_asset": "^kubejs-neoforge-.*\\\\.jar$"
+      "github_asset": "^kubejs-neoforge-.*\\.jar$"
     },
     {
       "name": "Better Advanced Tooltips",
@@ -57,7 +57,14 @@
       "github": "mezz/JustEnoughItems",
       "required": true,
       "group": "core",
-      "why": "Recipe viewer; FTB Quests and Ex Deorum ship JEI integrations."
+      "why": "Recipe viewer; FTB Quests and Ex Deorum ship JEI integrations.",
+      "maven": {
+        "repo": "https://maven.blamejared.com",
+        "group": "mezz/jei",
+        "artifact": "jei-1.21.1-neoforge",
+        "version_regex": "^19\\."
+      },
+      "github_asset": "^jei-1\\.21\\.1-neoforge-.*\\.jar$"
     },
     {
       "name": "Jade",
@@ -76,7 +83,7 @@
       "required": true,
       "group": "ftb",
       "why": "Shared UI/config library for every FTB mod.",
-      "github_asset": "^ftb-library-neoforge-.*\\\\.jar$"
+      "github_asset": "^ftb-library-neoforge-.*\\.jar$"
     },
     {
       "name": "FTB Teams",
@@ -86,7 +93,7 @@
       "required": true,
       "group": "ftb",
       "why": "Team/progress backend for FTB Quests.",
-      "github_asset": "^ftb-teams-neoforge-.*\\\\.jar$"
+      "github_asset": "^ftb-teams-neoforge-.*\\.jar$"
     },
     {
       "name": "FTB Quests",
@@ -96,7 +103,7 @@
       "required": true,
       "group": "ftb",
       "why": "The quest book (two chapters: Welcome + Stone Age).",
-      "github_asset": "^ftb-quests-neoforge-.*\\\\.jar$"
+      "github_asset": "^ftb-quests-neoforge-.*\\.jar$"
     },
     {
       "name": "FTB Ultimine",
@@ -106,7 +113,7 @@
       "required": true,
       "group": "ftb",
       "why": "Vein-mining through the solid stone world (a QoL must for stone packs).",
-      "github_asset": "^ftb-ultimine-neoforge-.*\\\\.jar$"
+      "github_asset": "^ftb-ultimine-neoforge-.*\\.jar$"
     },
     {
       "name": "Mekanism",
@@ -119,7 +126,12 @@
       "github_asset_prefixes": [
         "Mekanism"
       ],
-      "github_asset": "^Mekanism-1\\\\.21\\\\.1-.*\\\\.jar$"
+      "github_asset": "^Mekanism-1\\.21\\.1-.*\\.jar$",
+      "maven": {
+        "repo": "https://modmaven.dev",
+        "group": "mekanism",
+        "artifact": "Mekanism"
+      }
     },
     {
       "name": "Applied Energistics 2",
@@ -129,7 +141,7 @@
       "required": true,
       "group": "tech",
       "why": "Storage/autocrafting endgame.",
-      "github_asset": "^(app)?liedenergistics2?-.*\\\\.jar$"
+      "github_asset": "^(app)?liedenergistics2?-.*\\.jar$"
     },
     {
       "name": "GuideME",
@@ -157,7 +169,7 @@
       "required": false,
       "group": "tech",
       "why": "Conduits + machines; heavy dependency chain, optional if it misbehaves.",
-      "github_asset": "^enderio-.*\\\\.jar$"
+      "github_asset": "^enderio-.*\\.jar$"
     },
     {
       "name": "Mystical Agriculture",
@@ -183,7 +195,7 @@
       "required": true,
       "group": "tech",
       "why": "Laser drills, mob farms, resource automation.",
-      "github_asset": "^(industrialforegoing|IndustrialForegoing)-.*\\\\.jar$"
+      "github_asset": "^(industrialforegoing|IndustrialForegoing)-.*\\.jar$"
     },
     {
       "name": "Titanium",
@@ -258,7 +270,7 @@
       "required": true,
       "group": "optimization",
       "why": "Big memory usage reduction.",
-      "github_asset": "^ferritecore-.*\\\\.jar$"
+      "github_asset": "^ferritecore-.*\\.jar$"
     },
     {
       "name": "ModernFix",
@@ -268,7 +280,7 @@
       "required": true,
       "group": "optimization",
       "why": "Faster startup and lower memory usage.",
-      "github_asset": "^modernfix-neoforge-.*mc1\\\\.21\\\\.1.*\\\\.jar$"
+      "github_asset": "^modernfix-neoforge-.*mc1\\.21\\.1.*\\.jar$"
     },
     {
       "name": "ImmediatelyFast",
@@ -278,7 +290,7 @@
       "required": true,
       "group": "optimization",
       "why": "Faster immediate-mode rendering (FPS).",
-      "github_asset": "^ImmediatelyFast-NeoForge-.*\\\\+1\\\\.21\\\\.1\\\\.jar$"
+      "github_asset": "^ImmediatelyFast-NeoForge-.*\\+1\\.21\\.1\\.jar$"
     }
   ]
 }

@@ -42,15 +42,22 @@ function inStoneWorld(server, command) {
     }
 }
 
-/** The stone world as a ServerLevel, or null when it is not loaded. */
-function stoneWorld(server) {
-    // LevelStem / dimension keys are resolved by id; getLevel accepts a string id in KubeJS
-    return server.getLevel(STONE_DIM)
-}
-
-/** True when the stone dimension exists and can be written to. */
+/**
+ * True when the stone dimension exists and can be written to.
+ * `getLevel` converts the id string to a dimension key; if a future KubeJS changes that
+ * conversion we assume the dimension exists (the `execute in` commands below are silent
+ * no-ops when it does not, so nothing can crash).
+ */
 function stoneWorldReady(server) {
-    return BUILD_IN_OVERWORLD || stoneWorld(server) != null
+    if (BUILD_IN_OVERWORLD) {
+        return true
+    }
+    try {
+        return server.getLevel(STONE_DIM) != null
+    } catch (err) {
+        console.warn("[allthestone1] getLevel(" + STONE_DIM + ") failed: " + err)
+        return true
+    }
 }
 
 /**
@@ -100,10 +107,25 @@ function sendToSpawnRoom(player) {
     if (!roomBuilt) {
         buildSpawnRoom(server)
     }
-    if (BUILD_IN_OVERWORLD) {
-        player.teleportTo(server.overworld, SPAWN.x + 0.5, SPAWN.y, SPAWN.z + 0.5, 180, 0)
-    } else {
-        player.teleportTo(STONE_DIM, SPAWN.x + 0.5, SPAWN.y, SPAWN.z + 0.5, 180, 0)
+
+    const x = SPAWN.x + 0.5
+    const y = SPAWN.y
+    const z = SPAWN.z + 0.5
+
+    try {
+        if (BUILD_IN_OVERWORLD) {
+            player.teleportTo(server.overworld, x, y, z, 180, 0)
+        } else {
+            player.teleportTo(STONE_DIM, x, y, z, 180, 0)
+        }
+    } catch (err) {
+        // fall back to a vanilla command if the Java overload changed
+        console.warn("[allthestone1] teleportTo failed (" + err + "), using /tp")
+        if (BUILD_IN_OVERWORLD) {
+            server.runCommandSilent(`tp ${player.username} ${x} ${y} ${z}`)
+        } else {
+            server.runCommandSilent(`execute in ${STONE_DIM} run tp ${player.username} ${x} ${y} ${z}`)
+        }
     }
 }
 
