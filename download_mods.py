@@ -185,8 +185,24 @@ def download_file(url: str, dest: Path, expected_sha512: str | None = None,
             tmp.unlink(missing_ok=True)
             return False
 
+    if not is_jar(tmp):
+        print("    ! downloaded file is not a valid jar (HTML error page?), discarding")
+        tmp.unlink(missing_ok=True)
+        return False
+
     tmp.replace(dest)
     return True
+
+
+def is_jar(path: Path) -> bool:
+    """A jar is a zip archive - this catches CDN error pages saved as .jar."""
+    try:
+        with zipfile.ZipFile(path) as z:
+            names = z.namelist()
+            # every Forge/NeoForge mod jar carries at least one of these
+            return any(n.endswith(".class") or n.endswith(".json") for n in names)
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def download_with_mirrors(url: str, dest: Path, expected_sha512: str | None = None,
@@ -237,6 +253,10 @@ def download_asset_by_id(mod: dict, asset_id: int, dest: Path, expected_sha512: 
             print("    ! checksum mismatch, discarding file")
             tmp.unlink(missing_ok=True)
             return False
+    if not is_jar(tmp):
+        print("    ! downloaded file is not a valid jar, discarding")
+        tmp.unlink(missing_ok=True)
+        return False
     tmp.replace(dest)
     return True
 

@@ -7,7 +7,7 @@ name: fetch-mods
 # even from behind a filtering proxy, because api.github.com is reachable everywhere.
 on:
   push:
-    branches: ["**"]
+    branches-ignore: [mods-store]   # the jar store branch must not re-trigger itself
     paths:
       - "modlist.json"
       - "download_mods.py"
@@ -90,3 +90,52 @@ jobs:
             --notes "$notes" \
             mods/*.jar dist/*.mrpack MISSING_MODS.md download-log.txt || true
           gh release view mods-latest --json assets --jq '.assets[].name' | sort
+
+  # Keeps a git-only copy of the jars. Handy for machines whose outbound filter allows
+  # github.com (git protocol) but not the release CDNs:
+  #     git fetch origin mods-store && git archive FETCH_HEAD mods | tar -x
+  store-branch:
+    needs: fetch
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Re-create the download in this job
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+        run: python3 download_mods.py 2>&1 | tail -5
+      - name: Commit the jars to the mods-store branch
+        run: |
+          set -e
+          size=$(du -sm mods | cut -f1)
+          echo "mods/: ${size} MiB"
+          if [ "$size" -gt 95 ]; then echo "too big for a git branch, skipping"; exit 0; fi
+          git config user.name  "allthestone1-bot"
+          git config user.email "bot@users.noreply.github.com"
+          mkdir -p /tmp/jars && cp mods/*.jar /tmp/jars/
+          git checkout --orphan mods-store
+          git rm -rf --cached . >/dev/null
+          rm -rf ./* .github .gitignore 2>/dev/null || true
+          mkdir -p mods
+          cp /tmp/jars/*.jar mods/
+          cat > README.md <<'EOF'
+          # allthestone1 - mod jar store
+
+          Do not edit by hand. This branch only exists so the jars can be fetched over the
+          git protocol on networks where the mod CDNs are filtered:
+
+              git fetch origin mods-store
+              git archive FETCH_HEAD mods | tar -x
+
+          The pack itself lives on the default branch.
+          EOF
+          git add -A -f
+          git commit -q -m "mods: 1.21.1 / NeoForge jar set ($(date -u +%Y-%m-%d))"
+          git push -f origin mods-store
