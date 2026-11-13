@@ -262,13 +262,13 @@
       "why": "Dependency of Sophisticated Backpacks."
     },
     {
-      "name": "Cobble For Days",
-      "id": "cobblefordays",
-      "search": "cobble for days",
-      "curseforge": "cobble-for-days",
+      "name": "Cobblestone Generator",
+      "id": "cobblestone-generator",
+      "search": "cobblestone generator",
+      "curseforge": "cobblestone-generator",
       "required": false,
       "group": "tech",
-      "why": "Compact cobblestone generator. If it is not available for 1.21.1 NeoForge, Ex Deorum's barrel + lava + water setup covers it."
+      "why": "Standalone cobblestone generator block (1.21.1 NeoForge). Cobble For Days has no 1.21.1 build; Ex Deorum's barrel + lava + water remains the fallback."
     },
     {
       "name": "Embeddium",
