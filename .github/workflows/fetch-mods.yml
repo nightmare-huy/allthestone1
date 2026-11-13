@@ -37,10 +37,14 @@ jobs:
       - name: Download every jar (Modrinth -> CurseForge -> Maven -> GitHub)
         env:
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
-        run: python3 download_mods.py
+        run: python3 download_mods.py 2>&1 | tee download-log.txt
 
       - name: Report
         run: |
+          echo "===== download log =====" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat download-log.txt >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
           echo "### jars in mods/" >> "$GITHUB_STEP_SUMMARY"
           ls -la mods/*.jar 2>/dev/null | wc -l >> "$GITHUB_STEP_SUMMARY" || true
           if [ -f MISSING_MODS.md ]; then
@@ -76,5 +80,5 @@ jobs:
           gh release create mods-latest \
             --title "Mods (1.21.1 / NeoForge, $(date -u +%Y-%m-%d))" \
             --notes "$notes" \
-            mods/*.jar dist/*.mrpack MISSING_MODS.md mods/installed.json mods/manifest.json
+            mods/*.jar dist/*.mrpack MISSING_MODS.md download-log.txt || true
           gh release view mods-latest --json assets --jq '.assets[].name' | sort
