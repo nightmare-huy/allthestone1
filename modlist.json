@@ -279,14 +279,6 @@
       "why": "Renderer replacement (Sodium port for NeoForge)."
     },
     {
-      "name": "Sodium",
-      "id": "sodium",
-      "curseforge": "sodium",
-      "required": false,
-      "group": "optimization",
-      "why": "Alternative renderer - install this OR Embeddium, never both."
-    },
-    {
       "name": "Ferrite Core",
       "id": "ferrite-core",
       "curseforge": "ferrite-core",
